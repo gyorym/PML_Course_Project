@@ -1,0 +1,111 @@
+---
+title: "Practical Machine Learning Class Project"
+author: "Matt Gyory"
+date: "May 17, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(caret)
+require(knitr)
+require(randomForest)
+require(dplyr)
+```
+
+## Summary
+
+The activity data is downloaded and imported into the R session. The data are examined and the variables that are not used (i.e. marked as NA) are excluded as are several variables that serve idenfication purposes for the data (e.g. user names). A model is then created using Random Forests. Since the outcome is a factor-type variable, a random forest should give a highly accurate result. Cross validation and discussion of the sample error are also conducted. 
+
+###Download and import data
+```{r}
+
+#Note: To save compiling time, the data were downloaded and loaded into the system separately
+#trainurl<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+#testurl<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+#trainfile<-".../pml-training.csv"
+#testfile<-".../pml-testing.csv"
+
+#download.file(trainurl,destfile=trainfile)
+#download.file(testurl,destfile = testfile)
+
+```
+The files are then loaded into R.
+
+```{r, echo=FALSE}
+
+project.training<-read.csv("C:/Users/mgyory/Documents/Assignments/Data Science Cert/Practical Machine Learning/Course Project/pml-training.csv", na.strings= c("NA",""," "))
+project.testing<-read.csv("C:/Users/mgyory/Documents/Assignments/Data Science Cert/Practical Machine Learning/Course Project/pml-testing.csv", na.strings= c("NA",""," "))
+
+```
+
+```{r}
+#project.training<-read.csv(trainfile)
+#project.testing<-read.csv(testfile)
+```
+
+###Clean up data
+Many of the variable columns in the Testing and Training datasets contain only missing or NA values. Since including these fields could cause confusion in the model, they are excluded from the data.
+
+```{r}
+training_na<-apply(project.training,2,function(x){sum(is.na(x))})
+
+#The following columns were exlcuded because they only contained NA values:
+training_na[which(training_na!=0)]
+
+training_update<-project.training[,which(training_na==0)]
+#The dataset now contains about 60 variables. However, some of these are id variables that should not be used as predictors (such as names and timestamps). These are the first 7 fields. They are removed in the following step.
+
+training_update<-training_update[8:length(training_update)]
+```
+
+###Model Selection
+
+Since there are over 19,000 observations in the data, it is further subset to provide a cross-validation dataset for later use.75% of the data is used to train the model and 25% is left for cross-validation.
+
+```{r}
+train_use<-createDataPartition(y=training_update$classe,p=0.75,list=FALSE)
+train_final<-training_update[train_use,]
+cross_final<-training_update[-train_use,]
+```
+
+Because the outcome we were trying to predict is a factor that produced distinct groups (i.e. the classe variable), we require a model that determines how like a group is based on a set of predictors. This requirement leads to predicting with trees and random forests produce highly accurate tree predictors. Closely correlated varialbes is less of a concern with this model. Cross-validation will be used to address issues with overfitting. 
+
+```{r}
+train_rf<-train(classe~.,data=train_final,method="rf",prox=TRUE)
+train_rf
+```
+
+Given the high accuracy rate of the model, we move on to the cross-validation checks. 
+
+###Cross Validation
+
+The cross-validation data are then used to evaulate the accuracy of the random forest model.
+
+```{r}
+crosspred<-predict(train_rf,cross_final)
+confusionMatrix(crosspred,cross_final$classe)
+```
+
+The high accuracy value for the cross-validation and the extremely low p-value for the Accuracy vs No Information Rate indicate that our Random Forest model should do a good job a correctly predicting the testing data.
+
+###Testing the model
+
+The first step in comparing the predicted to actual results is to make the same adjustments to the testing data we did to the training data.
+
+```{r}
+testing_na<-apply(project.testing,2,function(x){sum(is.na(x))})
+
+testing_update<-project.testing[,which(testing_na==0)]
+#The dataset now contains about 60 variables. However, some of these are id variables that should not be used as predictors (such as names and timestamps). These are the first 7 fields. They are removed in the following step.
+
+testing_update<-testing_update[8:length(testing_update)]
+```
+
+The next step is to predict based on our saved model. The results are not displayed as they are the answer to the final quiz.
+
+```{r}
+predicttest<-predict(train_rf,testing_update)
+#predicttest
+```
